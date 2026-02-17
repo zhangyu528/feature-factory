@@ -1,0 +1,41 @@
+name: Feature Proposals - Propose
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 1 * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: feature-proposals-propose
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      FEATURE_AGENT_ENGINE: glm
+      FEATURE_LLM_MODEL: ${{ vars.FEATURE_LLM_MODEL || 'glm-4.7' }}
+      FEATURE_LLM_BASE_URL: https://open.bigmodel.cn/api/coding/paas/v4
+      GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Ensure on main branch
+        run: git checkout main
+
+      - name: Run propose phase
+        run: node pipeline-run.js propose

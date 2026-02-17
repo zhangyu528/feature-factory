@@ -1,0 +1,11 @@
+﻿{
+  "FEATURE_AGENT_ENGINE": "glm",
+  "GLM_API_KEY": "replace-with-your-glm-key",
+  "FEATURE_LLM_MODEL": "glm-4.7",
+  "FEATURE_LLM_BASE_URL": "https://open.bigmodel.cn/api/coding/paas/v4",
+  "FEATURE_LLM_TIMEOUT_MS": 60000,
+  "FEATURE_LLM_TEMPERATURE": 0.2,
+  "FEATURE_CONTEXT_MAX_FILES": 120,
+  "FEATURE_CONTEXT_MAX_SNIPPET_FILES": 8,
+  "FEATURE_CONTEXT_MAX_SNIPPET_CHARS": 1500
+}
