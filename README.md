@@ -27,7 +27,7 @@ Node.js automation toolkit for feature proposal workflow orchestration.
 ## Commands
 
 - `node pipeline-run.js propose`: phase 1 only (generate proposals + create issues).
-- `node pipeline-run.js sync`: phase 2 only (sync issue labels + create dev branches).
+- `node pipeline-run.js sync`: phase 2 only (sync issue labels + create dev branches + create dev tracking issues).
 - `node scripts/pipeline-generate-proposal.js`: proposal generation only.
 - `node scripts/pipeline-run-engine.js <glm|deepseek|openai> <input.json> <output.json>`: low-level model runner.
 
@@ -36,8 +36,9 @@ Node.js automation toolkit for feature proposal workflow orchestration.
 - Each proposal is created as a GitHub Issue.
 - Add label `approved` to approve a proposal.
 - Add label `rejected` to reject a proposal.
-- Sync step closes resolved issues automatically.
-- `sync` is stateless: it reads GitHub Issues directly and does not require local proposal files from previous runs.
+- Rejected proposals are auto-closed by sync.
+- For each approved proposal, sync creates a `dev/*` branch and an additional `[Dev] ...` tracking issue.
+- If a dev tracking issue already exists for that feature, proposal issue is auto-closed.
 
 ## Configuration File (Recommended)
 

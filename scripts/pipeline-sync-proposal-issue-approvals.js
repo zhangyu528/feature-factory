@@ -1,20 +1,21 @@
 const { ensureMainBranch } = require("../lib/git");
-const { listIssues, closeIssue } = require("../lib/github");
+const { ensureLabel, listIssues, closeIssue } = require("../lib/github");
 const { ROOT } = require("../lib/registry");
 
 function normalizeLabels(labels) {
   return (labels || []).map((x) => String((x && x.name) || "").toLowerCase()).filter(Boolean);
 }
 
-function hasAllLabels(labels, required) {
-  return required.every((x) => labels.includes(String(x).toLowerCase()));
-}
-
 function main() {
   ensureMainBranch(ROOT);
 
+  ensureLabel("feature-proposal", ROOT, "0E8A16", "Feature proposal items");
+  ensureLabel("pending-review", ROOT, "D4C5F9", "Waiting for proposal decision");
+  ensureLabel("approved", ROOT, "0E8A16", "Proposal approved");
+  ensureLabel("rejected", ROOT, "B60205", "Proposal rejected");
+
   const openIssues = listIssues({ state: "open", limit: 200 }, ROOT);
-  let approvedClosed = 0;
+  let approvedOpen = 0;
   let rejectedClosed = 0;
   let pending = 0;
   let skipped = 0;
@@ -29,9 +30,8 @@ function main() {
     const isApproved = labels.includes("approved");
     const isRejected = labels.includes("rejected");
 
-    if (isApproved) {
-      closeIssue(issue.number, ROOT);
-      approvedClosed += 1;
+    if (isApproved && !isRejected) {
+      approvedOpen += 1;
       continue;
     }
 
@@ -41,16 +41,11 @@ function main() {
       continue;
     }
 
-    if (hasAllLabels(labels, ["feature-proposal", "pending-review"])) {
-      pending += 1;
-      continue;
-    }
-
     pending += 1;
   }
 
   console.log(
-    `[feature:issue:sync] approved_closed=${approvedClosed} rejected_closed=${rejectedClosed} pending=${pending} skipped=${skipped}`
+    `[feature:issue:sync] approved_open=${approvedOpen} rejected_closed=${rejectedClosed} pending=${pending} skipped=${skipped}`
   );
 }
 
