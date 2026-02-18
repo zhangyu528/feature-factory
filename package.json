@@ -1,6 +1,6 @@
 {
   "name": "@zhangyu528/feature-factory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Feature proposal workflow toolkit",
   "bin": {
     "feature-factory": "feature-factory.js"
