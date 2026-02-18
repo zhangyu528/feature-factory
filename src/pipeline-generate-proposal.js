@@ -4,7 +4,7 @@ const path = require("path");
 const { ensureMainBranch, mainSha, currentBranch } = require("./lib/git");
 const { readJson, writeJson, writeText, ensureDir } = require("./lib/fs-utils");
 const { ROOT, FEATURES_ROOT, upsertFeatureItems, saveLatest } = require("./lib/registry");
-const { readRequiredStringConfig, readRequiredNumberConfig, readNumberConfig } = require("./lib/config");
+const { readRequiredStringConfig, readNumberConfig } = require("./lib/config");
 const { getOctokit, getRepo } = require("./lib/github-api");
 const { runEngine } = require("./pipeline-run-engine");
 
@@ -38,97 +38,18 @@ async function listRepoTrackedFiles() {
     .sort();
 }
 
-function likelyTextFile(relPath) {
-  const ext = path.extname(relPath).toLowerCase();
-  return [
-    ".md",
-    ".txt",
-    ".json",
-    ".js",
-    ".cjs",
-    ".mjs",
-    ".ts",
-    ".tsx",
-    ".jsx",
-    ".yml",
-    ".yaml",
-    ".toml",
-    ".ini",
-    ".env",
-    ".sh",
-    ".ps1",
-  ].includes(ext);
+function isMarkdownFile(relPath) {
+  return path.extname(relPath).toLowerCase() === ".md";
 }
 
 function chooseTrackedFiles(files, maxCount) {
-  const priorityExact = [
-    "README.md",
-    "AGENTS.md",
-    "package.json",
-    "src/pipeline-run.js",
-    "src/pipeline-generate-proposal.js",
-    "src/pipeline-create-proposal-issues.js",
-    "src/pipeline-sync-proposal-issue-approvals.js",
-    "src/pipeline-create-dev-branches-from-approved.js",
-  ];
-  const priorityPrefixes = ["src/lib/", "engines/"];
-
-  const picked = [];
-  const pickedSet = new Set();
-  const push = (f) => {
-    if (!f || pickedSet.has(f)) return;
-    picked.push(f);
-    pickedSet.add(f);
-  };
-
-  for (const f of priorityExact) {
-    if (files.includes(f)) push(f);
-    if (picked.length >= maxCount) return picked;
-  }
-
-  for (const f of files) {
-    if (!likelyTextFile(f)) continue;
-    if (!priorityPrefixes.some((p) => f.startsWith(p))) continue;
-    push(f);
-    if (picked.length >= maxCount) return picked;
-  }
-
-  for (const f of files) {
-    if (!likelyTextFile(f)) continue;
-    push(f);
-    if (picked.length >= maxCount) return picked;
-  }
-
-  return picked;
+  const mdFiles = files.filter(isMarkdownFile);
+  return mdFiles.slice(0, maxCount);
 }
 
 function chooseSnippetFiles(files) {
-  const priority = [
-    "README.md",
-    "AGENTS.md",
-    "src/pipeline-run.js",
-    "src/pipeline-generate-proposal.js",
-    "src/pipeline-create-proposal-issues.js",
-    "src/pipeline-sync-proposal-issue-approvals.js",
-    "src/pipeline-create-dev-branches-from-approved.js",
-    "src/lib/prompt-utils.js",
-    "src/lib/git.js",
-  ];
-
-  const picked = [];
-  for (const p of priority) {
-    if (files.includes(p)) picked.push(p);
-    if (picked.length >= MAX_SNIPPET_FILES) return picked;
-  }
-
-  for (const f of files) {
-    if (!likelyTextFile(f)) continue;
-    if (picked.includes(f)) continue;
-    if (!(f.startsWith("src/lib/") || f.startsWith("engines/"))) continue;
-    picked.push(f);
-    if (picked.length >= MAX_SNIPPET_FILES) break;
-  }
-  return picked;
+  const mdFiles = files.filter(isMarkdownFile);
+  return mdFiles.slice(0, MAX_SNIPPET_FILES);
 }
 
 async function readFileSnippetFromRepo(relPath) {
@@ -157,9 +78,10 @@ async function readFileSnippetFromRepo(relPath) {
 
 async function collectRepoContext() {
   const tracked = await listRepoTrackedFiles();
+  const markdownFiles = tracked.filter(isMarkdownFile);
   const snippets = {};
 
-  for (const rel of chooseSnippetFiles(tracked)) {
+  for (const rel of chooseSnippetFiles(markdownFiles)) {
     const text = await readFileSnippetFromRepo(rel);
     if (text) snippets[rel] = text;
   }
@@ -167,8 +89,8 @@ async function collectRepoContext() {
   return {
     repositoryRoot: ROOT,
     branch: await currentBranch(ROOT),
-    trackedFiles: chooseTrackedFiles(tracked, MAX_FILE_LIST),
-    trackedFilesTotal: tracked.length,
+    trackedFiles: chooseTrackedFiles(markdownFiles, MAX_FILE_LIST),
+    trackedFilesTotal: markdownFiles.length,
     fileSnippets: snippets,
   };
 }
@@ -315,8 +237,3 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-
-
-
-
-
