@@ -3,13 +3,13 @@ name: Feature Proposals - Propose
 on:
   workflow_dispatch:
   schedule:
-    # 每天执行一次(北京时间 CST 09:15)
-    # 换算公式: UTC 01:15 + 8小时 = CST 09:15
+    # Daily at 01:15 UTC (09:15 CST)
     - cron: "15 1 * * *"
 
 permissions:
   contents: read
   issues: write
+  packages: read
 
 concurrency:
   group: feature-proposals-propose
@@ -20,25 +20,21 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      FEATURE_AGENT_ENGINE: glm
-      FEATURE_LLM_MODEL: ${{ vars.FEATURE_LLM_MODEL || 'glm-4.7' }}
-      FEATURE_LLM_BASE_URL: https://open.bigmodel.cn/api/coding/paas/v4
-      GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      FEATURE_AGENT_ENGINE: ${{ vars.FEATURE_AGENT_ENGINE }}
+      FEATURE_LLM_MODEL: ${{ vars.FEATURE_LLM_MODEL }}
+      FEATURE_LLM_BASE_URL: ${{ vars.FEATURE_LLM_BASE_URL }}
+      FEATURE_LLM_API_KEY: ${{ secrets.FEATURE_LLM_API_KEY }}
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      - name: Ensure on main branch
-        run: git checkout main
+          registry-url: "https://npm.pkg.github.com"
 
       - name: Run propose phase
-        run: node pipeline-run.js propose
+        run: npx @zhangyu528/feature-factory propose
+        working-directory: ${{ github.workspace }}
+
+

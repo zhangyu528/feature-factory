@@ -1,8 +1,10 @@
+"use strict";
+
 const path = require("path");
-const { ensureMainBranch, mainSha } = require("../lib/git");
-const { ensureLabel, findOpenIssueByTitle, createIssueSafe } = require("../lib/github");
-const { readJson } = require("../lib/fs-utils");
-const { ROOT, loadLatest, loadRegistry, saveRegistry } = require("../lib/registry");
+const { ensureMainBranch, mainSha } = require("./lib/git");
+const { ensureLabel, findOpenIssueByTitle, createIssueSafe } = require("./lib/github");
+const { readJson } = require("./lib/fs-utils");
+const { ROOT, loadLatest, loadRegistry, saveRegistry } = require("./lib/registry");
 
 function renderFeatureDoc(feature, baseSha) {
   const lines = [];
@@ -52,26 +54,26 @@ function issueBody(feature, baseSha) {
   ].join("\n");
 }
 
-function main() {
-  ensureMainBranch(ROOT);
+async function main() {
+  await ensureMainBranch(ROOT);
   const latest = loadLatest();
   if (!latest) throw new Error("LATEST.json not found. run propose generation first.");
 
   const featuresData = readJson(path.resolve(ROOT, latest.featuresPath));
-  const items = (featuresData.features || []);
+  const items = featuresData.features || [];
   if (items.length === 0) {
     console.log("[feature:issue:create] no features.");
     return;
   }
 
-  ensureLabel("feature-proposal", ROOT, "0E8A16", "Feature proposal items");
-  ensureLabel("pending-review", ROOT, "D4C5F9", "Waiting for proposal decision");
-  ensureLabel("approved", ROOT, "0E8A16", "Proposal approved");
-  ensureLabel("rejected", ROOT, "B60205", "Proposal rejected");
+  await ensureLabel("feature-proposal", ROOT, "0E8A16", "Feature proposal items");
+  await ensureLabel("pending-review", ROOT, "D4C5F9", "Waiting for proposal decision");
+  await ensureLabel("approved", ROOT, "0E8A16", "Proposal approved");
+  await ensureLabel("rejected", ROOT, "B60205", "Proposal rejected");
 
   const registry = loadRegistry();
   const regMap = new Map(registry.items.map((x) => [x.featureId, x]));
-  const baseSha = mainSha(ROOT);
+  const baseSha = await mainSha(ROOT);
   let created = 0;
   let reused = 0;
 
@@ -86,16 +88,16 @@ function main() {
       continue;
     }
 
-    let issue = findOpenIssueByTitle(title, ROOT);
+    const issue = await findOpenIssueByTitle(title, ROOT);
     let issueNumber = null;
     let issueUrl = "";
 
     if (issue) {
       issueNumber = issue.number;
-      issueUrl = issue.url;
+      issueUrl = issue.html_url || issue.url || "";
       reused += 1;
     } else {
-      const url = createIssueSafe(
+      const url = await createIssueSafe(
         {
           title,
           body: issueBody(feature, baseSha),
@@ -104,7 +106,7 @@ function main() {
         ROOT
       );
       issueUrl = url;
-      const m = url.match(/\/issues\/(\d+)/);
+      const m = String(url || "").match(/\/issues\/(\d+)/);
       issueNumber = m ? Number(m[1]) : null;
       created += 1;
     }
@@ -122,4 +124,14 @@ function main() {
   console.log(`[feature:issue:create] created=${created} reused=${reused}`);
 }
 
-main();
+module.exports = {
+  main,
+};
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error && error.stack ? error.stack : String(error));
+    process.exit(1);
+  });
+}
+

@@ -1,0 +1,28 @@
+{
+  "name": "@zhangyu528/feature-factory",
+  "version": "0.1.0",
+  "description": "Feature proposal workflow toolkit",
+  "bin": {
+    "feature-factory": "feature-factory.js"
+  },
+  "scripts": {
+    "propose": "node src/pipeline-run.js propose",
+    "sync": "node src/pipeline-run.js sync"
+  },
+  "files": [
+    "feature-factory.js",
+    "src/**",
+    "engines/**",
+    "README.md"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhangyu528/feature-factory.git"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.1.1"
+  }
+}

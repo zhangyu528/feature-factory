@@ -1,0 +1,34 @@
+# Node dependencies
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Runtime artifacts
+coverage/
+build/
+.tmp/
+tmp/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Feature factory local config override
+feature-factory.config.json
+
+# Published CLI entry in dist
+dist/
+
+

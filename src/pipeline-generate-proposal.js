@@ -1,12 +1,12 @@
-﻿const fs = require("fs");
-const path = require("path");
-const { spawnSync } = require("child_process");
-const { ensureMainBranch, mainSha, currentBranch } = require("../lib/git");
-const { readJson, writeJson, writeText, ensureDir } = require("../lib/fs-utils");
-const { ROOT, FEATURES_ROOT, upsertFeatureItems, saveLatest } = require("../lib/registry");
-const { readStringConfig, readNumberConfig } = require("../lib/config");
+"use strict";
 
-const ENGINE_RUNNER = path.resolve(__dirname, "pipeline-run-engine.js");
+const path = require("path");
+const { ensureMainBranch, mainSha, currentBranch } = require("./lib/git");
+const { readJson, writeJson, writeText, ensureDir } = require("./lib/fs-utils");
+const { ROOT, FEATURES_ROOT, upsertFeatureItems, saveLatest } = require("./lib/registry");
+const { readRequiredStringConfig, readRequiredNumberConfig, readNumberConfig } = require("./lib/config");
+const { getOctokit, getRepo } = require("./lib/github-api");
+const { runEngine } = require("./pipeline-run-engine");
 
 const MAX_FILE_LIST = Math.max(1, Math.floor(readNumberConfig("FEATURE_CONTEXT_MAX_FILES", 120)));
 const MAX_SNIPPET_FILES = Math.max(1, Math.floor(readNumberConfig("FEATURE_CONTEXT_MAX_SNIPPET_FILES", 8)));
@@ -19,23 +19,22 @@ function runId(now = new Date()) {
   return { date, time, iso };
 }
 
-function listGitTrackedFiles(root) {
-  const r = spawnSync("git", ["ls-files"], {
-    cwd: root,
-    stdio: ["ignore", "pipe", "pipe"],
-    encoding: "utf8",
-    shell: false,
+async function listRepoTrackedFiles() {
+  const octokit = getOctokit();
+  const { owner, repo } = getRepo();
+
+  const mainRef = await octokit.git.getRef({ owner, repo, ref: "heads/main" });
+  const commit = await octokit.git.getCommit({ owner, repo, commit_sha: mainRef.data.object.sha });
+  const tree = await octokit.git.getTree({
+    owner,
+    repo,
+    tree_sha: commit.data.tree.sha,
+    recursive: "true",
   });
-  if (r.error) {
-    throw new Error(`git ls-files failed: ${r.error.message}`);
-  }
-  if (r.status !== 0) {
-    throw new Error((r.stderr || r.stdout || "git ls-files failed").trim());
-  }
-  return String(r.stdout || "")
-    .split(/\r?\n/)
-    .map((x) => x.trim())
-    .filter(Boolean)
+
+  return (tree.data.tree || [])
+    .filter((x) => x && x.type === "blob" && x.path)
+    .map((x) => String(x.path))
     .sort();
 }
 
@@ -66,13 +65,13 @@ function chooseTrackedFiles(files, maxCount) {
     "README.md",
     "AGENTS.md",
     "package.json",
-    "scripts/pipeline-run.js",
-    "scripts/pipeline-generate-proposal.js",
-    "scripts/pipeline-create-proposal-issues.js",
-    "scripts/pipeline-sync-proposal-issue-approvals.js",
-    "scripts/pipeline-create-dev-branches-from-approved.js",
+    "src/pipeline-run.js",
+    "src/pipeline-generate-proposal.js",
+    "src/pipeline-create-proposal-issues.js",
+    "src/pipeline-sync-proposal-issue-approvals.js",
+    "src/pipeline-create-dev-branches-from-approved.js",
   ];
-  const priorityPrefixes = ["lib/", "engines/"];
+  const priorityPrefixes = ["src/lib/", "engines/"];
 
   const picked = [];
   const pickedSet = new Set();
@@ -107,13 +106,13 @@ function chooseSnippetFiles(files) {
   const priority = [
     "README.md",
     "AGENTS.md",
-    "scripts/pipeline-run.js",
-    "scripts/pipeline-generate-proposal.js",
-    "scripts/pipeline-create-proposal-issues.js",
-    "scripts/pipeline-sync-proposal-issue-approvals.js",
-    "scripts/pipeline-create-dev-branches-from-approved.js",
-    "lib/prompt-utils.js",
-    "lib/git.js",
+    "src/pipeline-run.js",
+    "src/pipeline-generate-proposal.js",
+    "src/pipeline-create-proposal-issues.js",
+    "src/pipeline-sync-proposal-issue-approvals.js",
+    "src/pipeline-create-dev-branches-from-approved.js",
+    "src/lib/prompt-utils.js",
+    "src/lib/git.js",
   ];
 
   const picked = [];
@@ -125,34 +124,49 @@ function chooseSnippetFiles(files) {
   for (const f of files) {
     if (!likelyTextFile(f)) continue;
     if (picked.includes(f)) continue;
-    if (!(f.startsWith("lib/") || f.startsWith("engines/"))) continue;
+    if (!(f.startsWith("src/lib/") || f.startsWith("engines/"))) continue;
     picked.push(f);
     if (picked.length >= MAX_SNIPPET_FILES) break;
   }
   return picked;
 }
 
-function safeReadSnippet(absPath) {
+async function readFileSnippetFromRepo(relPath) {
+  const octokit = getOctokit();
+  const { owner, repo } = getRepo();
+
   try {
-    const raw = fs.readFileSync(absPath, "utf8").replace(/^\uFEFF/, "");
-    return raw.slice(0, MAX_SNIPPET_CHARS);
+    const response = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: relPath,
+      ref: "main",
+    });
+    if (Array.isArray(response.data)) return "";
+
+    const content = String(response.data.content || "");
+    const encoding = String(response.data.encoding || "").toLowerCase();
+    if (!content || encoding !== "base64") return "";
+
+    const decoded = Buffer.from(content, "base64").toString("utf8").replace(/^\uFEFF/, "");
+    return decoded.slice(0, MAX_SNIPPET_CHARS);
   } catch {
     return "";
   }
 }
 
-function collectRepoContext() {
-  const tracked = listGitTrackedFiles(ROOT);
+async function collectRepoContext() {
+  const tracked = await listRepoTrackedFiles();
   const snippets = {};
+
   for (const rel of chooseSnippetFiles(tracked)) {
-    const abs = path.resolve(ROOT, rel);
-    const text = safeReadSnippet(abs);
+    const text = await readFileSnippetFromRepo(rel);
     if (text) snippets[rel] = text;
   }
 
   return {
     repositoryRoot: ROOT,
-    branch: currentBranch(ROOT),
+    branch: await currentBranch(ROOT),
     trackedFiles: chooseTrackedFiles(tracked, MAX_FILE_LIST),
     trackedFilesTotal: tracked.length,
     fileSnippets: snippets,
@@ -160,42 +174,25 @@ function collectRepoContext() {
 }
 
 function chooseEngine() {
-  const configuredRaw = readStringConfig("FEATURE_AGENT_ENGINE", "glm").trim().toLowerCase();
-  const configured = configuredRaw;
-
+  const configured = readRequiredStringConfig("FEATURE_AGENT_ENGINE").trim().toLowerCase();
   if (["glm", "deepseek", "openai"].includes(configured)) {
     return [configured];
   }
-
-  // Compatibility: if model name is mistakenly set in FEATURE_AGENT_ENGINE,
-  // treat it as a GLM model and keep provider as glm.
-  if (configured.startsWith("glm-")) {
-    const currentModel = readStringConfig("FEATURE_LLM_MODEL", "").trim();
-    if (!currentModel) {
-      process.env.FEATURE_LLM_MODEL = configuredRaw;
-    }
-    console.warn(
-      `[feature:generate] FEATURE_AGENT_ENGINE=${configuredRaw} looks like a model name; ` +
-      `using provider=glm and model=${readStringConfig("FEATURE_LLM_MODEL", configuredRaw)}`
-    );
-    return ["glm"];
-  }
-
   throw new Error(`unsupported FEATURE_AGENT_ENGINE=${configured}. supported: glm, deepseek, openai`);
 }
 
-function callRunner(engine, inputPath, outputPath) {
-  const result = spawnSync("node", [ENGINE_RUNNER, engine, inputPath, outputPath], {
-    cwd: ROOT,
-    stdio: "pipe",
-    encoding: "utf8",
-  });
-  return {
-    ok: result.status === 0,
-    status: result.status,
-    stdout: result.stdout || "",
-    stderr: result.stderr || "",
-  };
+async function callRunner(engine, inputPath, outputPath) {
+  try {
+    await runEngine(engine, inputPath, outputPath);
+    return { ok: true, status: 0, stdout: "", stderr: "" };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 1,
+      stdout: "",
+      stderr: error && error.stack ? error.stack : String(error),
+    };
+  }
 }
 
 function renderSummary(meta, payload) {
@@ -232,15 +229,15 @@ function validatePayload(data) {
   }
 }
 
-function main() {
-  ensureMainBranch(ROOT);
+async function main() {
+  await ensureMainBranch(ROOT);
 
   const info = runId();
   const runIdValue = `${info.date}-${info.time}`;
   const runDir = path.resolve(FEATURES_ROOT, "runs", info.date, info.time);
   ensureDir(runDir);
 
-  const input = collectRepoContext();
+  const input = await collectRepoContext();
 
   const inputPath = path.resolve(runDir, "agent_input.json");
   const outputPath = path.resolve(runDir, "agent_output.json");
@@ -250,8 +247,8 @@ function main() {
   let selected = "";
   const attempts = [];
   for (const engine of chooseEngine()) {
-    const r = callRunner(engine, inputPath, outputPath);
-    attempts.push({ engine, ok: r.ok, stderr: r.stderr.trim(), stdout: r.stdout.trim() });
+    const r = await callRunner(engine, inputPath, outputPath);
+    attempts.push({ engine, ok: r.ok, stderr: String(r.stderr || "").trim(), stdout: String(r.stdout || "").trim() });
     if (!r.ok) continue;
     payload = readJson(outputPath);
     selected = engine;
@@ -262,7 +259,7 @@ function main() {
   }
 
   validatePayload(payload);
-  const baseSha = mainSha(ROOT);
+  const baseSha = await mainSha(ROOT);
   const generatedAt = info.iso;
 
   const featuresJsonPath = path.resolve(runDir, "features.json");
@@ -308,17 +305,16 @@ function main() {
   console.log(`[feature:generate] run=${runIdValue} engine=${selected} features=${payload.features.length}`);
 }
 
-main();
+module.exports = {
+  main,
+};
 
-
-
-
-
-
-
-
-
-
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error && error.stack ? error.stack : String(error));
+    process.exit(1);
+  });
+}
 
 
 

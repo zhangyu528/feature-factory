@@ -1,4 +1,4 @@
-﻿function extractJsonObject(text) {
+function extractJsonObject(text) {
   const src = String(text || "").trim();
   if (!src) throw new Error("empty output from engine");
 
@@ -47,3 +47,4 @@ module.exports = {
   buildPrompt,
   validateEngineOutput,
 };
+

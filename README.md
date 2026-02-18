@@ -5,15 +5,15 @@ Node.js automation toolkit for feature proposal workflow orchestration.
 ## Project Structure
 
 - Root entry script:
-  - `pipeline-run.js`
-- Workflow implementation scripts in `scripts/`:
-  - `scripts/pipeline-generate-proposal.js`
-  - `scripts/pipeline-create-proposal-issues.js`
-  - `scripts/pipeline-sync-proposal-issue-approvals.js`
-  - `scripts/pipeline-create-dev-branches-from-approved.js`
-  - `scripts/pipeline-run-engine.js`
-  - `scripts/pipeline-run.js`
-- Shared modules in `lib/`:
+  - `src/pipeline-run.js`
+- Workflow implementation scripts in `src/`:
+  - `src/pipeline-generate-proposal.js`
+  - `src/pipeline-create-proposal-issues.js`
+  - `src/pipeline-sync-proposal-issue-approvals.js`
+  - `src/pipeline-create-dev-branches-from-approved.js`
+  - `src/pipeline-run-engine.js`
+  - `src/pipeline-run.js`
+- Shared modules in `src/lib/`:
   - `config.js`
   - `prompt-utils.js`
   - `llm-client.js`
@@ -22,14 +22,13 @@ Node.js automation toolkit for feature proposal workflow orchestration.
   - `registry.js`
   - `fs-utils.js`
 - Prompt templates in `engines/`.
-- Runtime config files at repo root (`feature-factory.config.json`, `feature-factory.config.example.json`).
 
 ## Commands
 
-- `node pipeline-run.js propose`: phase 1 only (generate proposals + create issues).
-- `node pipeline-run.js sync`: phase 2 only (sync issue labels + create dev branches + create dev tracking issues).
-- `node scripts/pipeline-generate-proposal.js`: proposal generation only.
-- `node scripts/pipeline-run-engine.js <glm|deepseek|openai> <input.json> <output.json>`: low-level model runner.
+- `node src/pipeline-run.js propose`: phase 1 only (generate proposals + create issues).
+- `node src/pipeline-run.js sync`: phase 2 only (sync issue labels + create dev branches + create dev tracking issues).
+- `node src/pipeline-generate-proposal.js`: proposal generation only.
+- `node src/pipeline-run-engine.js <glm|deepseek|openai> <input.json> <output.json>`: low-level model runner.
 
 ## Proposal Approval on GitHub
 
@@ -40,30 +39,26 @@ Node.js automation toolkit for feature proposal workflow orchestration.
 - For each approved proposal, sync creates a `dev/*` branch and an additional `[Dev] ...` tracking issue.
 - If a dev tracking issue already exists for that feature, proposal issue is auto-closed.
 
-## Configuration File (Recommended)
+## Environment Variables (Required)
 
-Create `feature-factory.config.json` in repo root. You can copy `feature-factory.config.example.json`.
-
-Supported keys (same names as env vars):
-
-- `FEATURE_AGENT_ENGINE`: default `glm` (provider only; supported: `glm`, `deepseek`, `openai`)
-- `FEATURE_LLM_MODEL`: set the model name (for example `glm-4.7`)
-- `GLM_API_KEY` (or `LLM_API_KEY` / `OPENAI_API_KEY`)
+- `FEATURE_AGENT_ENGINE` (required; supported: `glm`, `deepseek`, `openai`)
+- `FEATURE_LLM_MODEL`: model name (for example `glm-4.7`)
+- `FEATURE_LLM_API_KEY`
 - `FEATURE_LLM_BASE_URL`
-- `FEATURE_LLM_TIMEOUT_MS`
-- `FEATURE_LLM_TEMPERATURE`
-- `FEATURE_CONTEXT_MAX_FILES`
-- `FEATURE_CONTEXT_MAX_SNIPPET_FILES`
-- `FEATURE_CONTEXT_MAX_SNIPPET_CHARS`
-
-You can also put these under an `env` object in the JSON file.
-
-## Environment Variables (Optional)
-
-Environment variables still work and override config-file values.
+- `FEATURE_LLM_TIMEOUT_MS` (optional; default: `60000`)
+- `FEATURE_LLM_TEMPERATURE` (optional; default: `0.2`)
+- `FEATURE_CONTEXT_MAX_FILES` (optional; default: `120`)
+- `FEATURE_CONTEXT_MAX_SNIPPET_FILES` (optional; default: `8`)
+- `FEATURE_CONTEXT_MAX_SNIPPET_CHARS` (optional; default: `1500`)
 
 ## Prerequisites
 
 - `node`
 - `git`
-- `gh` (for GitHub issue/branch automation)
+- `GITHUB_TOKEN` in workflow environment (for GitHub issue/branch automation)
+
+
+If any required variable is missing, the pipeline fails fast with an error message.
+
+
+

@@ -13,7 +13,17 @@ function findGitRoot(startDir) {
   return null;
 }
 
-const ROOT = findGitRoot(__dirname) || path.resolve(__dirname, "..", "..", "..");
+function resolveRoot(startDir) {
+  const workspace = String(process.env.GITHUB_WORKSPACE || "").trim();
+  if (workspace) return path.resolve(workspace);
+
+  const gitRoot = findGitRoot(startDir);
+  if (gitRoot) return gitRoot;
+
+  return path.resolve(process.cwd());
+}
+
+const ROOT = resolveRoot(__dirname);
 const FEATURES_ROOT = path.resolve(ROOT, "feature-proposals");
 const STATE_DIR = path.resolve(FEATURES_ROOT, "state");
 const REGISTRY_PATH = path.resolve(STATE_DIR, "registry.json");
@@ -38,7 +48,6 @@ function normalizeRegistryItem(item) {
   if (next.proposalIssueNumber === undefined) next.proposalIssueNumber = null;
   if (!next.proposalIssueUrl) next.proposalIssueUrl = "";
 
-  // Drop deprecated PR-era fields from in-memory and persisted state.
   delete next.proposalBranch;
   delete next.proposalPrNumber;
   delete next.proposalPrUrl;

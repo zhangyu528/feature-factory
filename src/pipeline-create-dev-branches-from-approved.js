@@ -1,16 +1,13 @@
-const fs = require("fs");
-const path = require("path");
+"use strict";
+
 const {
   ensureMainBranch,
   mainSha,
-  checkout,
   checkoutNewBranch,
-  pushBranch,
-  runQuiet,
-  commitAll,
   branchExists,
   remoteBranchExists,
-} = require("../lib/git");
+  commitTextFile,
+} = require("./lib/git");
 const {
   ensureLabel,
   listIssues,
@@ -18,8 +15,8 @@ const {
   createIssueSafe,
   removeIssueLabels,
   closeIssue,
-} = require("../lib/github");
-const { ROOT } = require("../lib/registry");
+} = require("./lib/github");
+const { ROOT } = require("./lib/registry");
 
 function slugify(text) {
   return String(text || "")
@@ -92,7 +89,7 @@ function trackingIssueBody({ proposalIssue, featureId, featureTitle, devBranch, 
     `- feature_id: ${featureId}`,
     `- feature_title: ${featureTitle}`,
     `- proposal_issue: #${proposalIssue.number}`,
-    `- proposal_url: ${proposalIssue.url || ""}`,
+    `- proposal_url: ${proposalIssue.html_url || proposalIssue.url || ""}`,
     `- dev_branch: ${devBranch}`,
     `- feature_doc: \`${docRelPath}\``,
     "",
@@ -105,9 +102,9 @@ function trackingIssueBody({ proposalIssue, featureId, featureTitle, devBranch, 
   ].join("\n");
 }
 
-function findExistingDevIssue(featureId, featureTitle) {
+async function findExistingDevIssue(featureId, featureTitle) {
   const targetTitle = trackingIssueTitle(featureId, featureTitle);
-  const issues = listIssues({ state: "all", limit: 200 }, ROOT);
+  const issues = await listIssues({ state: "all", limit: 200 }, ROOT);
   for (const issue of issues) {
     const labels = normalizeLabels(issue.labels);
     if (!labels.includes("feature-dev")) continue;
@@ -126,19 +123,29 @@ function findExistingDevIssue(featureId, featureTitle) {
   return null;
 }
 
-function ensureDevTrackingIssue({ proposalIssue, featureId, featureTitle, devBranch, docRelPath }) {
-  const existing = findExistingDevIssue(featureId, featureTitle);
+async function ensureDevTrackingIssue({ proposalIssue, featureId, featureTitle, devBranch, docRelPath }) {
+  const existing = await findExistingDevIssue(featureId, featureTitle);
   if (existing) {
-    return { created: false, existedBefore: true, number: existing.number, url: existing.url || "" };
+    return {
+      created: false,
+      existedBefore: true,
+      number: existing.number,
+      url: existing.html_url || existing.url || "",
+    };
   }
 
   const title = trackingIssueTitle(featureId, featureTitle);
-  const quick = findOpenIssueByTitle(title, ROOT);
+  const quick = await findOpenIssueByTitle(title, ROOT);
   if (quick) {
-    return { created: false, existedBefore: true, number: quick.number, url: quick.url || "" };
+    return {
+      created: false,
+      existedBefore: true,
+      number: quick.number,
+      url: quick.html_url || quick.url || "",
+    };
   }
 
-  const url = createIssueSafe(
+  const url = await createIssueSafe(
     {
       title,
       body: trackingIssueBody({ proposalIssue, featureId, featureTitle, devBranch, docRelPath }),
@@ -150,13 +157,13 @@ function ensureDevTrackingIssue({ proposalIssue, featureId, featureTitle, devBra
   return { created: true, existedBefore: false, number: m ? Number(m[1]) : null, url };
 }
 
-function main() {
-  ensureMainBranch(ROOT);
+async function main() {
+  await ensureMainBranch(ROOT);
 
-  ensureLabel("feature-dev", ROOT, "0052CC", "Development tracking issues");
+  await ensureLabel("feature-dev", ROOT, "0052CC", "Development tracking issues");
 
-  const issues = listIssues({ state: "open", limit: 200 }, ROOT);
-  const baseSha = mainSha(ROOT);
+  const issues = await listIssues({ state: "open", limit: 200 }, ROOT);
+  const baseSha = await mainSha(ROOT);
   let createdBranches = 0;
   let createdDevIssues = 0;
   let reusedDevIssues = 0;
@@ -181,40 +188,27 @@ function main() {
     const devBranch = devBranchName(featureId, featureTitle);
     const markdown = extractProposalMarkdown(issue.body) || fallbackMarkdown(featureId, featureTitle);
     const docRelPath = featureDocRelPath(featureId);
-    const docAbsPath = path.resolve(ROOT, docRelPath);
 
-    const hasBranch = branchExists(ROOT, devBranch) || remoteBranchExists(ROOT, devBranch);
+    const hasBranch = (await branchExists(ROOT, devBranch)) || (await remoteBranchExists(ROOT, devBranch));
     if (!hasBranch) {
-      checkoutNewBranch(ROOT, devBranch, baseSha);
       try {
-        fs.mkdirSync(path.dirname(docAbsPath), { recursive: true });
-        fs.writeFileSync(docAbsPath, markdown, "utf8");
-
-        const committed = commitAll(
+        await checkoutNewBranch(ROOT, devBranch, baseSha);
+        await commitTextFile(
           ROOT,
-          `chore(feature): init dev branch for ${featureId}`,
-          docRelPath
+          devBranch,
+          docRelPath,
+          markdown,
+          `chore(feature): init dev branch for ${featureId}`
         );
-
-        if (!committed) {
-          runQuiet(
-            ["commit", "--allow-empty", "-m", `chore(feature): init dev branch for ${featureId}`],
-            ROOT
-          );
-        }
-
-        pushBranch(ROOT, devBranch);
-        checkout(ROOT, "main");
         createdBranches += 1;
       } catch (error) {
-        checkout(ROOT, "main");
         console.warn(`[feature:dev:create] skip issue=${issue.number} reason=${String(error.message || error)}`);
         skipped += 1;
         continue;
       }
     }
 
-    const tracked = ensureDevTrackingIssue({
+    const tracked = await ensureDevTrackingIssue({
       proposalIssue: issue,
       featureId,
       featureTitle,
@@ -224,11 +218,11 @@ function main() {
     if (tracked.created) createdDevIssues += 1;
     else reusedDevIssues += 1;
 
-    removeIssueLabels(issue.number, ["pending-review"], ROOT);
+    await removeIssueLabels(issue.number, ["pending-review"], ROOT);
 
     if (tracked.existedBefore) {
       try {
-        closeIssue(issue.number, ROOT);
+        await closeIssue(issue.number, ROOT);
         closedProposalIssues += 1;
       } catch {
         // best-effort close; keep sync resilient
@@ -236,10 +230,19 @@ function main() {
     }
   }
 
-  checkout(ROOT, "main");
   console.log(
     `[feature:dev:create] branches_created=${createdBranches} dev_issues_created=${createdDevIssues} dev_issues_reused=${reusedDevIssues} proposal_closed=${closedProposalIssues} skipped=${skipped}`
   );
 }
 
-main();
+module.exports = {
+  main,
+};
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error && error.stack ? error.stack : String(error));
+    process.exit(1);
+  });
+}
+
