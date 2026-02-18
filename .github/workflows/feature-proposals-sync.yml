@@ -3,7 +3,11 @@ name: Feature Proposals - Sync
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    # 每天执行三次 (基于 UTC+8 北京时间)
+    # 09:00 (UTC 01:00)
+    # 13:00 (UTC 05:00)
+    # 18:00 (UTC 10:00)
+    - cron: "0 1,5,10 * * *"
 
 permissions:
   contents: write
@@ -15,6 +19,7 @@ concurrency:
 
 jobs:
   sync:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

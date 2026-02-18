@@ -3,6 +3,8 @@ name: Feature Proposals - Propose
 on:
   workflow_dispatch:
   schedule:
+    # 每天执行一次(北京时间 CST 09:15)
+    # 换算公式: UTC 01:15 + 8小时 = CST 09:15
     - cron: "15 1 * * *"
 
 permissions:
@@ -15,6 +17,7 @@ concurrency:
 
 jobs:
   propose:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
