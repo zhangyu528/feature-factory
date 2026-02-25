@@ -23,4 +23,7 @@ Constraints:
 - Prefer actionable, testable features.
 - Avoid duplicates.
 - Keep each feature concise and implementation-facing.
-- Return exactly one JSON object and include only the `features` top-level field.
+- Return exactly one valid JSON object.
+- NO preamble or postscript text. NO markdown formatting outside the JSON.
+- Ensure all string values are properly escaped and wrapped in double quotes.
+- Include only the `features` top-level field.
