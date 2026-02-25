@@ -19,6 +19,9 @@ inputs:
   llm_base_url:
     description: 'Base URL for the LLM API'
     required: false
+  llm_timeout_ms:
+    description: 'Timeout for LLM requests in milliseconds (default: 120000)'
+    required: false
   feishu_webhook:
     description: 'Feishu/Lark Webhook URL for notifications'
     required: false

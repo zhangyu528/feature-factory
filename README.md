@@ -45,7 +45,7 @@ Node.js automation toolkit for feature proposal workflow orchestration.
 - `FEATURE_LLM_MODEL`: model name (for example `glm-4.7`)
 - `FEATURE_LLM_API_KEY`
 - `FEATURE_LLM_BASE_URL`
-- `FEATURE_LLM_TIMEOUT_MS` (optional; default: `60000`)
+- `FEATURE_LLM_TIMEOUT_MS` (optional; default: `120000`)
 - `FEATURE_LLM_TEMPERATURE` (optional; default: `0.2`)
 - `FEATURE_CONTEXT_MAX_FILES` (optional; default: `120`)
 - `FEATURE_CONTEXT_MAX_SNIPPET_FILES` (optional; default: `8`)

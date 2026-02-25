@@ -10,7 +10,7 @@ function resolveLlmConfig(providerInput) {
 
   const baseUrl = readRequiredStringConfig("FEATURE_LLM_BASE_URL").replace(/\/$/, "");
   const model = readRequiredStringConfig("FEATURE_LLM_MODEL");
-  const timeoutMs = Math.max(1000, Math.floor(readNumberConfig("FEATURE_LLM_TIMEOUT_MS", 60000)));
+  const timeoutMs = Math.max(1000, Math.floor(readNumberConfig("FEATURE_LLM_TIMEOUT_MS", 120000)));
   const temperature = readNumberConfig("FEATURE_LLM_TEMPERATURE", 0.2);
 
   if (provider === "glm") {
