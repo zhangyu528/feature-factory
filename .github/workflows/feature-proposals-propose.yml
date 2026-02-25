@@ -27,14 +27,19 @@ jobs:
       FEATURE_LLM_API_KEY: ${{ secrets.FEATURE_LLM_API_KEY }}
       NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          registry-url: "https://npm.pkg.github.com"
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Run propose phase
-        run: npx @zhangyu528/feature-factory propose
-        working-directory: ${{ github.workspace }}
+        uses: ./
+        with:
+          mode: 'propose'
+          engine: ${{ vars.FEATURE_AGENT_ENGINE }}
+          llm_model: ${{ vars.FEATURE_LLM_MODEL }}
+          llm_base_url: ${{ vars.FEATURE_LLM_BASE_URL }}
+          llm_api_key: ${{ secrets.FEATURE_LLM_API_KEY }}
+          wechat_webhook: ${{ secrets.FEATURE_NOTIFY_WECHAT_WEBHOOK }}
+          feishu_webhook: ${{ secrets.FEATURE_NOTIFY_FEISHU_WEBHOOK }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
 

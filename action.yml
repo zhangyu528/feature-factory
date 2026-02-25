@@ -1,0 +1,39 @@
+name: 'Feature Factory'
+description: 'AI-powered automation toolkit for feature proposal workflow orchestration.'
+author: 'zhangyu528'
+inputs:
+  mode:
+    description: 'Workflow mode: propose (generate features) or sync (create branches for approved features)'
+    required: true
+    default: 'propose'
+  engine:
+    description: 'LLM Engine to use (glm, deepseek, openai)'
+    required: true
+    default: 'glm'
+  llm_model:
+    description: 'Specific LLM model name'
+    required: false
+  llm_api_key:
+    description: 'API Key for the LLM provider'
+    required: true
+  llm_base_url:
+    description: 'Base URL for the LLM API'
+    required: false
+  feishu_webhook:
+    description: 'Feishu/Lark Webhook URL for notifications'
+    required: false
+  wechat_webhook:
+    description: 'WeChat Work Webhook URL for notifications'
+    required: false
+  github_token:
+    description: 'GitHub Token (automatically provided by secrets.GITHUB_TOKEN)'
+    required: true
+    default: ${{ github.token }}
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'package'
+  color: 'blue'

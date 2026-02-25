@@ -7,16 +7,11 @@
   },
   "scripts": {
     "propose": "node src/pipeline-run.js propose",
-    "sync": "node src/pipeline-run.js sync"
+    "sync": "node src/pipeline-run.js sync",
+    "build": "ncc build action-entry.js -o dist --minify --no-cache"
   },
-  "files": [
-    "feature-factory.js",
-    "src/**",
-    "engines/**",
-    "README.md"
-  ],
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.1"
   },
   "repository": {
     "type": "git",

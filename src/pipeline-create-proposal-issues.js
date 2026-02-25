@@ -5,6 +5,7 @@ const { ensureMainBranch, mainSha } = require("./lib/git");
 const { ensureLabel, findOpenIssueByTitle, createIssueSafe } = require("./lib/github");
 const { readJson } = require("./lib/fs-utils");
 const { ROOT, loadLatest, loadRegistry, saveRegistry } = require("./lib/registry");
+const { sendNotifications } = require("./lib/notifier");
 
 function renderFeatureDoc(feature, baseSha) {
   const lines = [];
@@ -76,6 +77,7 @@ async function main() {
   const baseSha = await mainSha(ROOT);
   let created = 0;
   let reused = 0;
+  const verifiedProposals = [];
 
   for (const feature of items) {
     const reg = regMap.get(feature.featureId);
@@ -85,6 +87,12 @@ async function main() {
 
     if (reg.proposalIssueNumber && reg.proposalIssueState === "open") {
       reused += 1;
+      verifiedProposals.push({
+        title: feature.title,
+        priority: feature.priority,
+        url: reg.proposalIssueUrl || "",
+        featureId: feature.featureId,
+      });
       continue;
     }
 
@@ -117,11 +125,22 @@ async function main() {
     reg.approvalStatus = "pending";
     reg.status = "issue_open";
     reg.lastSeenAt = new Date().toISOString();
+
+    verifiedProposals.push({
+      title: feature.title,
+      priority: feature.priority,
+      url: issueUrl,
+      featureId: feature.featureId,
+    });
   }
 
   registry.items = [...regMap.values()];
   saveRegistry(registry);
   console.log(`[feature:issue:create] created=${created} reused=${reused}`);
+  
+  if (verifiedProposals.length > 0) {
+    await sendNotifications(verifiedProposals);
+  }
 }
 
 module.exports = {

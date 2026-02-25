@@ -28,7 +28,7 @@ Thumbs.db
 # Feature factory local config override
 feature-factory.config.json
 
-# Published CLI entry in dist
-dist/
+# Bundle for GitHub Action (should be committed)
+!dist/
 
 

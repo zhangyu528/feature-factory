@@ -51,6 +51,44 @@ Node.js automation toolkit for feature proposal workflow orchestration.
 - `FEATURE_CONTEXT_MAX_SNIPPET_FILES` (optional; default: `8`)
 - `FEATURE_CONTEXT_MAX_SNIPPET_CHARS` (optional; default: `1500`)
 
+## Notifications (Optional)
+
+Configure these variables to enable notifications after proposals are generated:
+
+- `FEATURE_NOTIFY_FEISHU_WEBHOOK`: Webhook URL for Feishu/Lark custom bot.
+- `FEATURE_NOTIFY_WECHAT_WEBHOOK`: Webhook URL for WeChat Work group bot.
+
+## Usage as GitHub Action
+
+You can use `feature-factory` directly in your GitHub Actions workflow. This is the recommended way to use it as it handles environment setup and dependency installation for you.
+
+### Example Workflow
+
+Create `.github/workflows/feature-factory.yml`:
+
+```yaml
+name: Feature Factory
+
+on:
+  workflow_dispatch: # Allow manual trigger
+  schedule:
+    - cron: '0 0 * * *' # Run daily at midnight
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate Feature Proposals
+        uses: zhangyu528/feature-factory@v1
+        with:
+          engine: 'glm'
+          llm_api_key: ${{ secrets.FEATURE_LLM_API_KEY }}
+          wechat_webhook: ${{ secrets.FEATURE_NOTIFY_WECHAT_WEBHOOK }}
+```
+
 ## Prerequisites
 
 - `node`
